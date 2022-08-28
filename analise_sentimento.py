@@ -44,6 +44,26 @@ class Analise:
         regressao_logistica.fit(treino, classe_treino)
         return regressao_logistica.score(teste, classe_teste)
 
+    def classificar_texto_tdif(self, coluna_texto, coluna_classificacao):
+        tfidf = TfidfVectorizer(lowercase=False, max_features=50)
+        tfidf_tratados = tfidf.fit_transform(self.dataset[coluna_texto])
+        treino, teste, classe_treino, classe_teste = train_test_split(tfidf_tratados,
+                                                                      self.dataset[coluna_classificacao],
+                                                                      random_state = self.seed)
+        regressao_logistica = LogisticRegression(solver = "lbfgs")
+        regressao_logistica.fit(treino, classe_treino)
+        return regressao_logistica, tfidf.get_feature_names(), regressao_logistica.score(teste, classe_teste)
+
+    def classificar_texto_ngrams(self, coluna_texto, coluna_classificacao):
+        tfidf = TfidfVectorizer(lowercase=False, ngram_range = (1,2))
+        tfidf_tratados = tfidf.fit_transform(self.dataset[coluna_texto])
+        treino, teste, classe_treino, classe_teste = train_test_split(tfidf_tratados,
+                                                                      self.dataset[coluna_classificacao],
+                                                                      random_state = self.seed)
+        regressao_logistica = LogisticRegression(solver = "lbfgs")
+        regressao_logistica.fit(treino, classe_treino)
+        return regressao_logistica, tfidf.get_feature_names(), regressao_logistica.score(teste, classe_teste)
+
     def nuvem_palavras_neg(self, coluna_texto):
         texto_negativo = self.dataset.query("sentiment == 'neg'")
         todas_palavras = ' '.join([texto for texto in texto_negativo[coluna_texto]])
@@ -80,41 +100,20 @@ class Analise:
         ax.set(ylabel = "Contagem")
         plt.show()
 
-resenha = pd.read_csv("imdb-reviews-pt-br.csv")
-
-classificacao = resenha["sentiment"].replace(["neg", "pos"], [0,1])
-resenha["classificacao"] = classificacao
-
+resenha = pd.read_csv("imdb-reviews-pt-brV2.csv").drop(columns=["Unnamed: 0"], axis=1)
 analise = Analise(resenha, 45)
-#  teste = analise.classificar_texto("text_pt", "classificacao")
-#  teste = analise.nuvem_palavras_neg("text_pt")
-#  teste = analise.nuvem_palavras_pos("text_pt")
-#  teste = analise.pareto("text_pt", 10)
 
-token_espaco    = tokenize.WhitespaceTokenizer()
-token_pontuacao = tokenize.WordPunctTokenizer()
+#  reg_logistica_tdif, feature_names_tdif, tdif_score = analise.classificar_texto_tdif("tratamento_3", "classificacao")
+#  print(tdif_score)
 
-analise.processar_frases("text_pt", "tratamento_1", token_espaco)
+reg_logistica_ngrams, feature_names_ngrams, ngrams_score = analise.classificar_texto_ngrams("tratamento_3", "classificacao")
+print(ngrams_score)
 
-pontuacao = list()
-for ponto in punctuation:
-    pontuacao.append(ponto)
+pesos = pd.DataFrame(
+    reg_logistica_ngrams.coef_[0].T,
+    index = feature_names_ngrams
+)
 
-palavras_irrelevantes = nltk.corpus.stopwords.words("portuguese")
-pontuacao_stopwords = pontuacao + palavras_irrelevantes
-analise.processar_frases("tratamento_1","tratamento_2", token_pontuacao, pontuacao_stopwords)
+print(pesos.nlargest(50,0))
+print(pesos.nsmallest(10,0))
 
-stopwords_sem_acento = [unidecode.unidecode(texto) for texto in pontuacao_stopwords]
-
-sem_acentos = [unidecode.unidecode(texto) for texto in resenha["tratamento_2"]]
-resenha["tratamento_3"] = sem_acentos
-
-analise.processar_frases("tratamento_3","tratamento_3", token_pontuacao, stopwords_sem_acento)
-
-#  resenha["tratamento_4"] = resenha["tratamento_3"].str.lower()
-
-
-print(resenha["text_pt"][0])
-print(resenha["tratamento_3"][0])
-#  analise.pareto("tratamento_3", 10, token_espaco)
-#  print(teste)
