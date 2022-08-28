@@ -4,12 +4,12 @@ import seaborn as sns
 
 import nltk
 from nltk import tokenize
-
+#  nltk.download('rslp')
 import unidecode
 
 from sklearn.model_selection import train_test_split
 from sklearn.linear_model import LogisticRegression
-from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.feature_extraction.text import CountVectorizer, TfidfVectorizer
 
 from string import punctuation
 from wordcloud import WordCloud
@@ -19,69 +19,20 @@ class Analise:
     def __init__(self, dataset, seed):
         self.dataset = dataset
         self.seed = seed 
-        self.token_pontuacao = tokenize.WordPunctTokenizer()
-        self.token_espaco    = tokenize.WhitespaceTokenizer()
-        #  self.stemmer         = nltk.RSLPStemmer()
+        self.stemmer = nltk.RSLPStemmer()
 
-    def processar_frases(self, new_column):
-        palavras_irrelevantes = nltk.corpus.stopwords.words("portuguese")
-        frase_processada = list()
-        for opiniao in self.dataset.text_pt:
-            nova_frase = list()
-            palavras_texto = self.token_espaco.tokenize(opiniao)
-            for palavra in palavras_texto:
-                if palavra not in palavras_irrelevantes:
-                    nova_frase.append(palavra)
-            frase_processada.append(' '.join(nova_frase))
-           
-        self.dataset[new_column] = frase_processada
-
-    def processar_pontuacao(self, ref_column, new_column):
-        palavras_irrelevantes = nltk.corpus.stopwords.words("portuguese")
-        pontuacao = list()
-        for ponto in punctuation:
-            pontuacao.append(ponto)
-       
-        pontuacao_stopwords = pontuacao + palavras_irrelevantes
+    def processar_frases(self, ref_column, new_column, token, palavras_irrelevantes = nltk.corpus.stopwords.words("portuguese")):
         frase_processada = list()
         for opiniao in self.dataset[ref_column]:
             nova_frase = list()
-            palavras_texto = self.token_pontuacao.tokenize(opiniao)
+            opiniao = opiniao.lower()
+            palavras_texto = token.tokenize(opiniao)
             for palavra in palavras_texto:
-                if palavra not in pontuacao_stopwords:
-                    nova_frase.append(palavra)
+                if palavra not in palavras_irrelevantes:
+                    nova_frase.append(self.stemmer.stem(palavra))
             frase_processada.append(' '.join(nova_frase))
            
         self.dataset[new_column] = frase_processada
-    
-    def processar_acentuacao(self, ref_column, new_column):
-        print( len(pontuacao_stopwords) )
-        stopwords_sem_acento = [unidecode.unidecode(texto) for texto in pontuacao_stopwords]
-        sem_acentos = [unidecode.unidecode(texto) for texto in self.dataset[ref_column]]
-        self.dataset[new_column] = sem_acentos
-
-        frase_processada = list()
-        for opiniao in self.dataset[new_column]:
-            nova_frase = list()
-            palavras_texto = self.token_pontuacao.tokenize(opiniao)
-            for palavra in palavras_texto:
-                if palavra not in stopwords_sem_acento:
-                    nova_frase.append(palavra)
-            frase_processada.append(' '.join(nova_frase))
-           
-        self.dataset[new_column] = frase_processada
-
-    def processar_flex_deriv(self, ref_column, new_column):
-        frase_processada = list()
-        for opiniao in resenha[ref_column]:
-            nova_frase = list()
-            palavras_texto = self.token_pontuacao.tokenize(opiniao)
-            for palavra in palavras_texto:
-                if palavra not in stopwords_sem_acento:
-                    nova_frase.append(stemmer.stem(palavra))
-            frase_processada.append(' '.join(nova_frase))
-           
-        resenha[new_column] = frase_processada
 
     def classificar_texto(self, coluna_texto, coluna_classificacao):
         vetorizar = CountVectorizer(lowercase=False, max_features=50)
@@ -117,9 +68,9 @@ class Analise:
         plt.axis("off")
         plt.show()
 
-    def pareto(self, coluna_texto, quantidade):
+    def pareto(self, coluna_texto, quantidade, token):
         todas_palavras = ' '.join([texto for texto in self.dataset[coluna_texto]])
-        token_frase = self.token_espaco.tokenize(todas_palavras)
+        token_frase = token.tokenize(todas_palavras)
         frequencia = nltk.FreqDist(token_frase)
         df_frequencia = pd.DataFrame({"Palavra": list(frequencia.keys()),
                                       "Frequência": list(frequencia.values())})
@@ -139,8 +90,31 @@ analise = Analise(resenha, 45)
 #  teste = analise.nuvem_palavras_neg("text_pt")
 #  teste = analise.nuvem_palavras_pos("text_pt")
 #  teste = analise.pareto("text_pt", 10)
-analise.processar_frases("tratamento_1")
-analise.processar_pontuacao("tratamento_1","tratamento_2")
-analise.processar_pontuacao("tratamento_2","tratamento_3")
-teste = analise.pareto("tratamento_3", 10)
+
+token_espaco    = tokenize.WhitespaceTokenizer()
+token_pontuacao = tokenize.WordPunctTokenizer()
+
+analise.processar_frases("text_pt", "tratamento_1", token_espaco)
+
+pontuacao = list()
+for ponto in punctuation:
+    pontuacao.append(ponto)
+
+palavras_irrelevantes = nltk.corpus.stopwords.words("portuguese")
+pontuacao_stopwords = pontuacao + palavras_irrelevantes
+analise.processar_frases("tratamento_1","tratamento_2", token_pontuacao, pontuacao_stopwords)
+
+stopwords_sem_acento = [unidecode.unidecode(texto) for texto in pontuacao_stopwords]
+
+sem_acentos = [unidecode.unidecode(texto) for texto in resenha["tratamento_2"]]
+resenha["tratamento_3"] = sem_acentos
+
+analise.processar_frases("tratamento_3","tratamento_3", token_pontuacao, stopwords_sem_acento)
+
+#  resenha["tratamento_4"] = resenha["tratamento_3"].str.lower()
+
+
+print(resenha["text_pt"][0])
+print(resenha["tratamento_3"][0])
+#  analise.pareto("tratamento_3", 10, token_espaco)
 #  print(teste)
